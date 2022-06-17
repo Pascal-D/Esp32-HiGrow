@@ -17,6 +17,8 @@ const u_int8_t soilPin = 32;
 
 u_int8_t errorState = 0;
 
+TaskHandle_t  boardLedControl ; 
+
 void ledOff(u_int8_t led,u_int8_t inverted){
   if (inverted){
     digitalWrite(led, HIGH); 
@@ -33,9 +35,30 @@ void ledOn(u_int8_t led,u_int8_t inverted){
   }
 }
 
+void ledflash(u_int8_t led,u_int8_t inverted,u_int16_t timer) {
+  ledOn(led,inverted);
+  delay(timer);            
+  ledOff(led,inverted);
+  delay(timer);             
+}
+
+void BoardLedControl( void * error ){
+  for (;;){
+    delay(200);
+    if(*((int*)error) != 0){
+      while(1){
+        ledflash(boardLed,1,200);
+      }
+    } 
+  }
+}
+
 void setup() {
    // run on serialPort 9600 for debugOutput
   Serial.begin(9600);
+
+  //setup new thread for board-LED controll
+  xTaskCreatePinnedToCore(BoardLedControl,"boardLedControl",1000,(void*)&errorState,1,&boardLedControl,1);
 
   //start dht sensor
   dht.begin();
@@ -45,23 +68,16 @@ void setup() {
   ledOff(boardLed,1);
 }
 
-void ledflash(u_int8_t led,u_int8_t inverted,u_int16_t timer) {
-  ledOn(led,inverted);
-  delay(timer);            
-  ledOff(led,inverted);
-  delay(timer);             
-}
-
 void debugOutput(float humidity, float temperature,float heatIndex, float soilHumidity){
   if (isnan(humidity) || isnan(temperature)) {
     Serial.println(F("Failed to read from DHT sensor!"));
-    ledOn(boardLed,1);
+    errorState = 1;
     return;
   }
   else if (isnan(soilHumidity))
   {
     Serial.println(F("Failed to read from Soil-Humidity Sensor!"));
-    ledOn(boardLed,1);
+    errorState = 2;
     return;
   }
   
@@ -81,6 +97,7 @@ void loop() {
   
   // Wait a few seconds between measurements.
   delay(2000);
+  
   // Reading temperature or humidity takes about 250 milliseconds!
   // Sensor readings may also be up to 2 seconds 'old' (its a very slow sensor)
 
