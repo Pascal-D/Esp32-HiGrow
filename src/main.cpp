@@ -17,6 +17,8 @@ const u_int8_t soilPin = 32;
 
 u_int8_t errorState = 0;
 
+TaskHandle_t  boardLedControl ; 
+
 void ledOff(u_int8_t led,u_int8_t inverted){
   if (inverted){
     digitalWrite(led, HIGH); 
@@ -33,6 +35,21 @@ void ledOn(u_int8_t led,u_int8_t inverted){
   }
 }
 
+void ledflash(u_int8_t led,u_int8_t inverted,u_int16_t timer) {
+  ledOn(led,inverted);
+  delay(timer);            
+  ledOff(led,inverted);
+  delay(timer);             
+}
+
+void BoardLedControl( void * parameter ){
+    for (;;){ 
+      if (errorState != 0){
+        ledflash(boardLed,1,100);
+      } 
+    } 
+  }
+
 void setup() {
    // run on serialPort 9600 for debugOutput
   Serial.begin(9600);
@@ -43,25 +60,20 @@ void setup() {
   //Setup Board-LED
   pinMode(boardLed,OUTPUT); 
   ledOff(boardLed,1);
-}
 
-void ledflash(u_int8_t led,u_int8_t inverted,u_int16_t timer) {
-  ledOn(led,inverted);
-  delay(timer);            
-  ledOff(led,inverted);
-  delay(timer);             
+  //setup new thread for board-LED controll
+  xTaskCreatePinnedToCore(BoardLedControl,"boardLedControl",1000,NULL,1,&boardLedControl,1);
 }
 
 void debugOutput(float humidity, float temperature,float heatIndex, float soilHumidity){
   if (isnan(humidity) || isnan(temperature)) {
     Serial.println(F("Failed to read from DHT sensor!"));
-    ledOn(boardLed,1);
     return;
   }
   else if (isnan(soilHumidity))
   {
     Serial.println(F("Failed to read from Soil-Humidity Sensor!"));
-    ledOn(boardLed,1);
+    errorState=2;
     return;
   }
   
