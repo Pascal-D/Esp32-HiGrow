@@ -13,7 +13,16 @@ DHT dht(dhtPin, dhtType);
 //init SoilHumiditySensor
 const u_int8_t soilPin = 32;
 
-#define BOARD_LED 16
+const u_int8_t boardLed = 16;
+u_int8_t bootFlag = 1;
+
+void ledOff(){ 
+  digitalWrite(boardLed, HIGH); //LED is inverted...
+}
+
+void ledOn(){
+  digitalWrite(boardLed, LOW); //LED is inverted...
+}
 
 void setup() {
   // put your setup code here, to run once:
@@ -21,19 +30,28 @@ void setup() {
   Serial.begin(9600); // run on serialPort 9600 for debugOutput
   dht.begin();  // init dhtSensor
 
-  //pinMode(BOARD_LED,OUTPUT); Setup PinMode for LED
+  pinMode(boardLed,OUTPUT); //Setup PinMode for LED
+  ledOff(); //LED is inverted...
   //digitalWrite(PIN, STATE); STATE = LOW/HIGH
 }
 
+void ledflash(u_int16_t timer) {
+  ledOn();
+  delay(timer);            
+  ledOff();
+  delay(timer);             
+}
 
 void debugOutput(float humidity, float temperature,float heatIndex, float soilHumidity){
   if (isnan(humidity) || isnan(temperature)) {
     Serial.println(F("Failed to read from DHT sensor!"));
+    ledOn();
     return;
   }
   else if (isnan(soilHumidity))
   {
     Serial.println(F("Failed to read from Soil-Humidity Sensor!"));
+    ledOn();
     return;
   }
   
