@@ -5,53 +5,63 @@
 #include <DHT.h>
 #include <DHT_U.h>
 
-//init DHT-Sensor
+//init dht sensor
 #define dhtType DHT11
-const u_int8_t dhtPin = 22;     //pin connected to the dhtSensor
+const u_int8_t dhtPin = 22;
 DHT dht(dhtPin, dhtType);
 
-//init SoilHumiditySensor
+//Board-LED is inverted...
+const u_int8_t boardLed = 16;
+
 const u_int8_t soilPin = 32;
 
-const u_int8_t boardLed = 16;
-u_int8_t bootFlag = 1;
+u_int8_t errorState = 0;
 
-void ledOff(){ 
-  digitalWrite(boardLed, HIGH); //LED is inverted...
+void ledOff(u_int8_t led,u_int8_t inverted){
+  if (inverted){
+    digitalWrite(led, HIGH); 
+  } else{
+    digitalWrite(led, LOW); 
+  }
 }
 
-void ledOn(){
-  digitalWrite(boardLed, LOW); //LED is inverted...
+void ledOn(u_int8_t led,u_int8_t inverted){
+    if (inverted){
+    digitalWrite(led, LOW); 
+  } else{
+    digitalWrite(led, HIGH); 
+  }
 }
 
 void setup() {
-  // put your setup code here, to run once:
+   // run on serialPort 9600 for debugOutput
+  Serial.begin(9600);
 
-  Serial.begin(9600); // run on serialPort 9600 for debugOutput
-  dht.begin();  // init dhtSensor
+  //start dht sensor
+  dht.begin();
 
-  pinMode(boardLed,OUTPUT); //Setup PinMode for LED
-  ledOff(); //LED is inverted...
-  //digitalWrite(PIN, STATE); STATE = LOW/HIGH
+  //Setup Board-LED
+  pinMode(boardLed,OUTPUT); 
+  ledOff(boardLed,1);
 }
 
-void ledflash(u_int16_t timer) {
-  ledOn();
+void ledflash(u_int8_t led,u_int8_t inverted,u_int16_t timer) {
+  ledOn(led,inverted);
   delay(timer);            
-  ledOff();
+  ledOff(led,inverted);
   delay(timer);             
 }
 
 void debugOutput(float humidity, float temperature,float heatIndex, float soilHumidity){
   if (isnan(humidity) || isnan(temperature)) {
     Serial.println(F("Failed to read from DHT sensor!"));
-    ledOn();
+    ledOn(boardLed,1);
     return;
   }
   else if (isnan(soilHumidity))
   {
     Serial.println(F("Failed to read from Soil-Humidity Sensor!"));
-    ledOn();
+    ledOn(boardLed,1);
     return;
   }
   
