@@ -17,6 +17,8 @@ const u_int8_t soilPin = 32;
 
 hw_timer_t * timer = NULL;
 
+u_int8_t errorState = 0;
+
 void ledOff(u_int8_t led,bool inverted){
   if (inverted){
     digitalWrite(led, HIGH); 
@@ -33,25 +35,21 @@ void ledOn(u_int8_t led,bool inverted){
   }
 }
 
-void ledflash(u_int8_t led,bool inverted,u_int16_t timer) {
-  ledOn(led,inverted);
-  delay(timer);            
-  ledOff(led,inverted);
-  delay(timer);             
-}
-
 void IRAM_ATTR onErrorTimer(){
     if(digitalRead(boardLed)){
-        ledOn(boardLed,true);
-    } else{
+      ledOn(boardLed,true);
+    } else {
       ledOff(boardLed,true);
     }
 }
 
-void errorTimer(){
+void errorTimer(u_int8_t timeModifier){
+  if(timer != NULL){
+    timerAlarmDisable(timer);
+  }
   timer = timerBegin(0,80,true);
   timerAttachInterrupt(timer,&onErrorTimer,true);
-  timerAlarmWrite(timer,1000000,true);
+  timerAlarmWrite(timer,100000*timeModifier,true);  //conversion to 100 ms
   timerAlarmEnable(timer);
 }
 
@@ -71,13 +69,21 @@ void debugOutput(float humidity, float temperature,float heatIndex, float soilHu
   if (isnan(humidity) || isnan(temperature)) {
     Serial.println(F("Failed to read from DHT sensor!"));
     if (timer == NULL){
-      errorTimer();
+      errorState = 1;
+      errorTimer(10);
+    } else if (errorState != 1){
+      errorState = 5;
+      errorTimer(2);
     }
     return;
   } else if (isnan(soilHumidity)){
     Serial.println(F("Failed to read from Soil-Humidity Sensor!"));
     if (timer == NULL){
-      errorTimer();
+      errorState = 2;
+      errorTimer(20);
+    } else if (errorState != 2){
+      errorState = 5;
+      errorTimer(2);
     }
     return;
   }
