@@ -15,11 +15,9 @@ const u_int8_t boardLed = 16;
 
 const u_int8_t soilPin = 32;
 
-u_int8_t errorState = 0;
+hw_timer_t * timer = NULL;
 
-TaskHandle_t  boardLedControl ; 
-
-void ledOff(u_int8_t led,u_int8_t inverted){
+void ledOff(u_int8_t led,bool inverted){
   if (inverted){
     digitalWrite(led, HIGH); 
   } else{
@@ -27,57 +25,60 @@ void ledOff(u_int8_t led,u_int8_t inverted){
   }
 }
 
-void ledOn(u_int8_t led,u_int8_t inverted){
-    if (inverted){
+void ledOn(u_int8_t led,bool inverted){
+  if (inverted){
     digitalWrite(led, LOW); 
   } else{
     digitalWrite(led, HIGH); 
   }
 }
 
-void ledflash(u_int8_t led,u_int8_t inverted,u_int16_t timer) {
+void ledflash(u_int8_t led,bool inverted,u_int16_t timer) {
   ledOn(led,inverted);
   delay(timer);            
   ledOff(led,inverted);
   delay(timer);             
 }
 
-void BoardLedControl( void * error ){
-  for (;;){
-    delay(200);
-    if(*((int*)error) != 0){
-      while(1){
-        ledflash(boardLed,1,200);
-      }
-    } 
-  }
+void IRAM_ATTR onErrorTimer(){
+    if(digitalRead(boardLed)){
+        ledOn(boardLed,true);
+    } else{
+      ledOff(boardLed,true);
+    }
+}
+
+void errorTimer(){
+  timer = timerBegin(0,80,true);
+  timerAttachInterrupt(timer,&onErrorTimer,true);
+  timerAlarmWrite(timer,1000000,true);
+  timerAlarmEnable(timer);
 }
 
 void setup() {
    // run on serialPort 9600 for debugOutput
   Serial.begin(9600);
 
-  //setup new thread for board-LED controll
-  xTaskCreatePinnedToCore(BoardLedControl,"boardLedControl",1000,(void*)&errorState,1,&boardLedControl,1);
-
   //start dht sensor
   dht.begin();
 
   //Setup Board-LED
   pinMode(boardLed,OUTPUT); 
-  ledOff(boardLed,1);
+  ledOff(boardLed,true);
 }
 
 void debugOutput(float humidity, float temperature,float heatIndex, float soilHumidity){
   if (isnan(humidity) || isnan(temperature)) {
     Serial.println(F("Failed to read from DHT sensor!"));
-    errorState = 1;
+    if (timer == NULL){
+      errorTimer();
+    }
     return;
-  }
-  else if (isnan(soilHumidity))
-  {
+  } else if (isnan(soilHumidity)){
     Serial.println(F("Failed to read from Soil-Humidity Sensor!"));
-    errorState = 2;
+    if (timer == NULL){
+      errorTimer();
+    }
     return;
   }
   
@@ -105,9 +106,6 @@ void loop() {
 
   // Read temperature as Celsius (the default)
   float temperature = dht.readTemperature();
-
-   // Check if any reads failed and exit early (to try again).
-
 
   // Compute heat index in Celsius (Temperature,Humidity,isFahreheit)
   float heatIndex = dht.computeHeatIndex(temperature, humidity, false);
